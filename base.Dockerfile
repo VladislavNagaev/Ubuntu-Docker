@@ -1,5 +1,5 @@
 # Образ на основе которого будет создан контейнер
-FROM --platform=linux/amd64 ubuntu:22.04
+FROM --platform=linux/amd64 ubuntu:16.04
 
 LABEL maintainer="Vladislav Nagaev <vladislav.nagaew@gmail.com>"
 
@@ -15,12 +15,10 @@ ENV \
     UID=1001 \
     GROUP=admin \
     GID=1001 \
-    GROUPS="admin,root,sudo" \
+    GROUPS="admin,root" \
     # Выбор time zone
     DEBIAN_FRONTEND=noninteractive \
     TZ=Europe/Moscow \
-    # Директория пользовательских приложений
-    APPS_HOME=/opt \
     # Задание версий сервисов
     JAVA_VERSION=8
 
@@ -31,7 +29,7 @@ ENV \
 
 ENV \
     # Обновление переменных путей
-    PATH=${PATH}:${JAVA_HOME}/bin \
+    PATH=${JAVA_HOME}/bin:${PATH} \
     # Задание директорий 
     WORK_DIRECTORY=/workspace \
     LOG_DIRECTORY=/tmp/logs \
@@ -47,43 +45,32 @@ RUN \
     # Замена ссылок на зеркало (https://launchpad.net/ubuntu/+archivemirrors)
     sed -i 's/htt[p|ps]:\/\/archive.ubuntu.com\/ubuntu\//http:\/\/mirror.truenetwork.ru\/ubuntu/g' /etc/apt/sources.list && \
     # Обновление путей
-    apt -y update && \
+    apt --yes update && \
     # Установка timezone
-    apt install -y tzdata && \
+    apt install --no-install-recommends --yes tzdata && \
     cp /usr/share/zoneinfo/${TZ} /etc/localtime && \
     echo ${TZ} > /etc/timezone && \
     # Установка языкового пакета
-    apt install -y locales && \
+    apt install --no-install-recommends --yes locales && \
     sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
     locale-gen  && \
     # --------------------------------------------------------------------------
     # --------------------------------------------------------------------------
     # Установка базовых пакетов
     # --------------------------------------------------------------------------
-    apt install -y apt-utils && \
-    echo Y | apt install -y curl && \
-    echo Y | apt install -y wget && \
-    apt install -y unzip && \
-    apt install -y ssh && \
-    apt install -y pdsh && \
-    apt install -y gettext-base && \
-    apt install -y netcat && \
-    # --------------------------------------------------------------------------
-    # --------------------------------------------------------------------------
-    # Установка C compiler (GCC)
-    # --------------------------------------------------------------------------
-    echo Y | apt install -y build-essential && \
-    apt install -y manpages-dev && \
+    apt install --no-install-recommends --yes apt-utils && \
+    apt install --no-install-recommends --yes curl && \
+    apt install --no-install-recommends --yes software-properties-common && \
     # --------------------------------------------------------------------------
     # --------------------------------------------------------------------------
     # Установка Java
     # --------------------------------------------------------------------------
     # Install OpenJDK
-    apt install -y openjdk-${JAVA_VERSION}-jdk && \
-    # Install Apache Ant
-    apt install -y ant && \
+    apt install --no-install-recommends --yes openjdk-${JAVA_VERSION}-jdk && \
     # Создание символической ссылки на Java
     ln -s /usr/lib/jvm/java-${JAVA_VERSION}-openjdk-amd64 /usr/lib/jvm/java && \
+    # Smoke test
+    java -version && \
     # --------------------------------------------------------------------------
     # --------------------------------------------------------------------------
     # Подготовка директорий
@@ -96,6 +83,10 @@ RUN \
     mkdir -p ${WORK_DIRECTORY} && \
     chown -R ${USER}:${GID} ${WORK_DIRECTORY} && \
     chmod -R a+rwx ${WORK_DIRECTORY} && \
+    # Директория entrypoint
+    mkdir -p ${ENTRYPOINT_DIRECTORY} && \
+    chown -R ${USER}:${GID} ${ENTRYPOINT_DIRECTORY} && \
+    chmod -R a+rx ${ENTRYPOINT_DIRECTORY} && \
     # --------------------------------------------------------------------------
     # --------------------------------------------------------------------------
     # Очистка кэша

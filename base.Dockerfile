@@ -1,5 +1,5 @@
 # Образ на основе которого будет создан контейнер
-FROM --platform=linux/amd64 ubuntu:16.04
+FROM --platform=linux/amd64 ubuntu:18.04
 
 LABEL maintainer="Vladislav Nagaev <vladislav.nagaew@gmail.com>"
 
@@ -61,6 +61,7 @@ RUN \
     apt install --no-install-recommends --yes apt-utils && \
     apt install --no-install-recommends --yes curl && \
     apt install --no-install-recommends --yes software-properties-common && \
+    apt install --no-install-recommends --yes netcat && \
     # --------------------------------------------------------------------------
     # --------------------------------------------------------------------------
     # Установка Java
@@ -89,6 +90,50 @@ RUN \
     chmod -R a+rx ${ENTRYPOINT_DIRECTORY} && \
     # --------------------------------------------------------------------------
     # --------------------------------------------------------------------------
+    # Подготовка shell-скриптов
+    # --------------------------------------------------------------------------
+    # Ожидание запуска сервиса
+    echo \
+'''#!/bin/bash \n\
+function wait_for_it() { \n\
+    local serviceport=$1 \n\
+    local service=${serviceport%%:*} \n\
+    local port=${serviceport#*:} \n\
+    local retry_seconds=5 \n\
+    local max_try=100 \n\
+    let i=1 \n\
+    nc -z $service $port \n\
+    result=$? \n\
+    until [ $result -eq 0 ]; do \n\
+      echo "[$i/$max_try] check for ${service}:${port}..." \n\
+      echo "[$i/$max_try] ${service}:${port} is not available yet" \n\
+      if (( $i == $max_try )); then \n\
+        echo "[$i/$max_try] ${service}:${port} is still not available; giving up after ${max_try} tries. :/" \n\
+        exit 1 \n\
+      fi \n\
+      echo "[$i/$max_try] try in ${retry_seconds}s once again ..." \n\
+      let "i++" \n\
+      sleep $retry_seconds \n\
+      nc -z $service $port \n\
+      result=$? \n\
+    done \n\
+    echo "[$i/$max_try] $service:${port} is available." \n\
+} \n\
+for i in ${SERVICE_PRECONDITION[@]} \n\
+do \n\
+    wait_for_it ${i} \n\
+done \n\
+''' > ${ENTRYPOINT_DIRECTORY}/wait_for_it.sh && \
+    cat ${ENTRYPOINT_DIRECTORY}/wait_for_it.sh && \
+    # --------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
+    # Настройка прав доступа скопированных файлов/директорий
+    # --------------------------------------------------------------------------
+    # Директория/файл entrypoint
+    chown -R ${USER}:${GID} ${ENTRYPOINT_DIRECTORY} && \
+    chmod -R a+x ${ENTRYPOINT_DIRECTORY} && \
+    # --------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
     # Очистка кэша
     # --------------------------------------------------------------------------
     rm -rf /var/lib/apt/lists/*
@@ -101,6 +146,9 @@ ENV \
     LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8
+
+# Выбор рабочей директории
+WORKDIR ${WORK_DIRECTORY}
 
 # Точка входа
 ENTRYPOINT ["/bin/bash"]

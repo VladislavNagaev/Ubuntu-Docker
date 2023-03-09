@@ -16,6 +16,7 @@ ENV \
     GROUP=admin \
     GID=1001 \
     GROUPS="admin,root" \
+    PASSWORD=admin \
     # Выбор time zone
     DEBIAN_FRONTEND=noninteractive \
     TZ=Europe/Moscow \
@@ -39,9 +40,11 @@ RUN \
     # --------------------------------------------------------------------------
     # Базовая настройка операционной системы
     # --------------------------------------------------------------------------
+    # Установка пароль пользователя root 
+    echo "root:root" | chpasswd && \
     # Создание группы и назначение пользователя в ней
     groupadd --gid ${GID} --non-unique ${GROUP} && \
-    useradd --system --create-home --home-dir ${HOME} --shell /bin/bash --gid ${GID} --groups ${GROUPS} --uid ${UID} ${USER} && \
+    useradd --system --create-home --home-dir ${HOME} --shell /bin/bash --gid ${GID} --groups ${GROUPS} --uid ${UID} --password ${PASSWORD} ${USER} && \
     # Замена ссылок на зеркало (https://launchpad.net/ubuntu/+archivemirrors)
     sed -i 's/htt[p|ps]:\/\/archive.ubuntu.com\/ubuntu\//http:\/\/mirror.truenetwork.ru\/ubuntu/g' /etc/apt/sources.list && \
     # Обновление путей
@@ -137,6 +140,16 @@ done \n\
     # Очистка кэша
     # --------------------------------------------------------------------------
     rm -rf /var/lib/apt/lists/*
+    # --------------------------------------------------------------------------
+
+# Копирование файлов проекта
+COPY ./entrypoint ${ENTRYPOINT_DIRECTORY}/
+
+RUN \
+    # --------------------------------------------------------------------------
+    # Выполнение shell-скриптов
+    # --------------------------------------------------------------------------
+    . ${ENTRYPOINT_DIRECTORY}/font-colors.sh
     # --------------------------------------------------------------------------
 
 ENV \
